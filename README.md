@@ -92,23 +92,8 @@ Daha fazla detay için [API.md](./API.md) dosyasına bakın.
 ## Veritabanı
 
 - `sos_calls`: Acil durum çağrıları
-- `assembly_areas`: Toplanma alanları
-- `hospitals`: Hastaneler
+- `acil_durum_toplanma_alanlari`: Toplanma alanları
+- `sağlık_sm_yonetim_saglik_merkezleri`: Hastaneler
 - Spatial indeksler: GIST indeksleri hızlı konum sorguları için kullanılır
 
-## Güvenlik
 
-- Backend: Helmet.js, CORS konfigürasyonu, input validasyonu, SQL injection koruması
-- Frontend: Content Security Policy, XSS koruması, güvenli API iletişimi
-
-## Mobil Uyumluluk
-
-- PWA desteği (Service Worker)
-- Responsive tasarım
-- Dokunmatik cihazlar için optimize edilmiş arayüz
-- Hızlı yükleme için asset optimizasyonu
-
-## Performans
-
-- Backend: Connection pooling, spatial indeksler, query optimizasyonu, compression middleware
-- Frontend: Lazy loading, asset bundling (Vite), CSS/JS minification, görsel optimizasyon
