@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: afetapp-db
+    environment:
+      POSTGRES_DB: afetapp
+      POSTGRES_USER: afetuser
+      POSTGRES_PASSWORD: afetpass123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - afetapp-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U afetuser -d afetapp"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: afetapp-backend
+    environment:
+      - NODE_ENV=production
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=afetapp
+      - DB_USER=afetuser
+      - DB_PASS=afetpass123
+      - PORT=3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - afetapp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: afetapp-web
+    ports:
+      - "5173:5173"
+    networks:
+      - afetapp-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: afetapp-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./ops/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - backend
+      - web
+    networks:
+      - afetapp-network
+
+volumes:
+  postgres_data:
+
+networks:
+  afetapp-network:
+    driver: bridge

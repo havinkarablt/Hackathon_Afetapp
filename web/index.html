@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="İstanbul Acil Durum Yönetim Sistemi - AfetApp" />
+    <meta name="keywords" content="afet, acil durum, istanbul, toplanma alanı, hastane, deprem" />
+    
+    <title>AfetApp - İstanbul Acil Durum</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" 
+          crossorigin="" />
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚨</text></svg>" />
+    
+    <!-- PWA Meta -->
+    <meta name="theme-color" content="#dc2626" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="AfetApp" />
+    
+    <!-- Open Graph -->
+    <meta property="og:title" content="AfetApp - İstanbul Acil Durum" />
+    <meta property="og:description" content="İstanbul'da acil durumlar için toplanma alanları ve hastaneler" />
+    <meta property="og:type" content="website" />
+    
+    <style>
+        /* Critical CSS - hızlı yükleme için */
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8fafc;
+            overflow-x: hidden;
+        }
+        
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 9999;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #dc2626;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Ana container gizli başlasın */
+        #app {
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+        
+        #app.loaded {
+            opacity: 1;
+        }
+        
+        /* Erişilebilirlik için focus outline */
+        *:focus {
+            outline: 2px solid #3b82f6;
+            outline-offset: 2px;
+        }
+        
+        /* Yüksek kontrast modu desteği */
+        @media (prefers-contrast: high) {
+            .emergency-button {
+                border: 3px solid #000 !important;
+            }
+        }
+        
+        /* Animasyon azaltma desteği */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading screen -->
+    <div id="loading" class="loading">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>AfetApp yükleniyor...</p>
+        <small>Konum izni istenecektir</small>
+    </div>
+    
+    <!-- Ana uygulama -->
+    <div id="app">
+        <!-- Header -->
+        <header id="app-header">
+            <h1>
+                <span class="logo">🚨</span>
+                AfetApp
+                <span class="subtitle">İstanbul</span>
+            </h1>
+            <div id="connection-status" class="status-indicator" aria-live="polite"></div>
+        </header>
+        
+        <!-- Ana kontroller -->
+        <main id="app-main">
+            <!-- Acil Durum Butonu -->
+            <section class="emergency-section">
+                <button 
+                    id="emergency-btn" 
+                    class="emergency-button"
+                    type="button"
+                    aria-describedby="emergency-help">
+                    <span class="icon" aria-hidden="true">🆘</span>
+                    <span class="text">ACİL DURUM</span>
+                    <span class="subtext">Konumunu gönder</span>
+                </button>
+                <p id="emergency-help" class="help-text">
+                    Acil durumda bu butona basarak konumunuzu merkeze bildirin
+                </p>
+            </section>
+            
+            <!-- Eylem butonları -->
+            <section class="actions-section">
+                <div class="action-buttons">
+                    <button 
+                        id="show-assembly-btn" 
+                        class="action-button assembly"
+                        type="button">
+                        <span class="icon">📍</span>
+                        <span class="text">Toplanma Alanları</span>
+                    </button>
+                    
+                    <button 
+                        id="show-hospitals-btn" 
+                        class="action-button hospital"
+                        type="button">
+                        <span class="icon">🏥</span>
+                        <span class="text">Hastaneler</span>
+                    </button>
+                </div>
+            </section>
+        </main>
+        
+        <!-- Harita konteyneri -->
+        <section class="map-section">
+            <div id="map" class="map-container" role="application" aria-label="İstanbul acil durum haritası"></div>
+            <div id="map-loading" class="map-loading">
+                <div class="spinner"></div>
+                <p>Harita yükleniyor...</p>
+            </div>
+        </section>
+        
+        <!-- Sonuç listesi -->
+        <section id="results-section" class="results-section" aria-live="polite">
+            <div id="results-header" class="results-header">
+                <h2 id="results-title">Yakın Konumlar</h2>
+                <button id="close-results" class="close-button" type="button" aria-label="Sonuçları kapat">×</button>
+            </div>
+            <div id="results-content" class="results-content"></div>
+        </section>
+        
+        <!-- Admin Panel Toggle (geliştirme için) -->
+        <aside class="admin-toggle">
+            <button id="admin-toggle" class="admin-button" type="button" title="Admin Panel">⚙️</button>
+        </aside>
+        
+        <!-- Admin Panel -->
+        <div id="admin-panel" class="admin-panel">
+            <div class="admin-header">
+                <h3>Admin Panel</h3>
+                <button id="close-admin" class="close-button" type="button">×</button>
+            </div>
+            <div id="admin-content" class="admin-content">
+                <div class="admin-stats"></div>
+                <div class="admin-calls"></div>
+            </div>
+        </div>
+        
+        <!-- Bildirimler -->
+        <div id="notifications" class="notifications-container" aria-live="assertive"></div>
+        
+        <!-- Footer -->
+        <footer id="app-footer">
+            <p>&copy; 2025 AfetApp - İstanbul Acil Durum Yönetim Sistemi</p>
+            <p>
+                <small>
+                    <a href="#" id="privacy-link">Gizlilik</a> | 
+                    <a href="#" id="help-link">Yardım</a> |
+                    <a href="/api" target="_blank">API</a>
+                </small>
+            </p>
+        </footer>
+    </div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" 
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" 
+            crossorigin=""></script>
+    
+    <!-- Ana uygulama -->
+    <script type="module" src="/src/main.js"></script>
+    
+    <!-- Service Worker (gelecek için) -->
+    <script>
+        // Service worker kayıt (PWA için)
+        if ('serviceWorker' in navigator && location.protocol === 'https:') {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('SW registered:', reg))
+                    .catch(err => console.log('SW registration failed:', err));
+            });
+        }
+    </script>
+</body>
+</html>
